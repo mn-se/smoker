@@ -15,8 +15,8 @@ public:
 private:
     const char* _logFilePath = "/smoker_log.csv";
     unsigned long _lastLogTime;
-    const unsigned long _logInterval = 60000; // Log every 60 seconds (1 minute)
-    const size_t _maxLogSize = 54000; // Max size: ~54KB (approx 30 hours at 1-min intervals)
+    const unsigned long _logInterval = 30000; // Log every 30 seconds
+    const size_t _maxLogSize = 108000; // Max size: ~108KB (adjusted for 30s intervals)
     void writeHeaderIfNeeded();
 };
 

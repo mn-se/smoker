@@ -1,7 +1,7 @@
 #ifndef MD5_MODULE_H
 #define MD5_MODULE_H
 
-#include <MD5Builder.h>
+#include <Arduino.h>
 
 class MD5Module {
 public:

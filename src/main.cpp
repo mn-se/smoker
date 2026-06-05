@@ -1,7 +1,6 @@
-#include <ESP8266WiFi.h>
-#include <LittleFS.h>
+#include "../include/platform_compat.h"
+#include "../include/hardware_pins.h"
 #include <DNSServer.h>
-#include <ESP8266mDNS.h>
 
 // --- Core モジュール ---
 #include "core/log_module.h"
@@ -51,7 +50,7 @@ OTAModule      ota;
 // [App]
 NTPModule              ntp;
 MD5Module              md5;
-MAX6675Module          max6675(D0, D5, D6);     // CS=D0, CLK=D5, SO=D6
+MAX6675Module          max6675(SMOKER_PIN_MAX6675_CS, SMOKER_PIN_MAX6675_CLK, SMOKER_PIN_MAX6675_SO);
 MerossControlModule    meross(ntp, md5);
 TempControlModule      tempControl(max6675, meross, logModule);
 SerialCmdModule        serialCmd(tempControl, meross);
@@ -130,7 +129,7 @@ void setup() {
     Serial.println("ESP8266 Smoker Controller v1.0");
     Serial.println("==============================");
 
-    randomSeed(analogRead(A0));
+    randomSeed(analogRead(SMOKER_RANDOM_SEED_PIN));
 
     // --- 設定読み込み ---
     Config config = DEFAULT_CONFIG;
@@ -199,7 +198,9 @@ void setup() {
 }
 
 void loop() {
+#if defined(ARDUINO_ARCH_ESP8266)
     MDNS.update();
+#endif
 
     if (isAPMode) {
         dnsServer.processNextRequest();

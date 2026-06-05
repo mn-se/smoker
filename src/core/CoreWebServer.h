@@ -1,8 +1,7 @@
 #ifndef CORE_WEB_SERVER_H
 #define CORE_WEB_SERVER_H
 
-#include <ESP8266WebServer.h>
-#include <LittleFS.h>
+#include "../../include/platform_compat.h"
 
 /**
  * CoreWebServer - ESP8266 HTTP サーバーのコア基盤
@@ -23,14 +22,17 @@ public:
     void handle();
 
     // AppAPIがルートを登録するために使用
-    ESP8266WebServer& server() { return _server; }
+    SmokerWebServer& server() { return _server; }
 
     // CORSヘッダ付きJSONレスポンス送信ヘルパー
     void sendJson(int code, const String& json);
 
 private:
-    ESP8266WebServer _server;
+    SmokerWebServer _server;
     bool _isCaptivePortal;
+
+    bool tryServeFile(const String& path);
+    String contentTypeFromPath(const String& path) const;
 };
 
 #endif

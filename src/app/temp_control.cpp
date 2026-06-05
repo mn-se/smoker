@@ -11,6 +11,10 @@ TempControlModule::TempControlModule(MAX6675Module& max6675, MerossControlModule
 
 void TempControlModule::setTargetTemp(float temp) {
     _targetTemp = temp;
+    // Reset integral and last error to avoid wind-up / large overshoot
+    _integral = 0;
+    _lastError = 0;
+    _pidOutput = 0;
 }
 
 void TempControlModule::setPIDConfig(float kp, float ki, float kd, unsigned long windowSize) {

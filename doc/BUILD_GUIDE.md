@@ -10,8 +10,10 @@
 
 *   **IDE**: Visual Studio Code + PlatformIO IDE 拡張機能
 *   **Framework**: Arduino
-*   **Platform**: espressif8266
-*   **Board**: ESP-WROOM-02 (ESP8266)
+*   **Platform**: espressif8266 / espressif32
+*   **Board**:
+    *   ESP-WROOM-02 (ESP8266)
+    *   M5Stack Core2 (ESP32)
 
 ---
 
@@ -48,33 +50,51 @@ python tools/meross_mss305.py <Merossの登録メールアドレス> <Merossの�
 
 ## 3. 書き込み手順
 
-ESP8266 には「プログラム（バイナリ）」と「WebUIデータ（ファイルシステム）」の **2種類** を書き込む必要があります。
+ESP8266 / ESP32 には「プログラム（バイナリ）」と「WebUIデータ（ファイルシステム）」の **2種類** を書き込む必要があります。
+
+### 3.0 ビルド環境の選択
+
+PlatformIO の env を明示して実行してください。
+
+*   ESP8266: `esp_wroom_02`
+*   M5Stack Core2: `m5stack-core2`
+
+例:
+
+```bash
+pio run -e esp_wroom_02
+pio run -e m5stack-core2
+```
 
 ### 3.1 プログラムの書き込み (Firmware - シリアル接続)
 ソースコード（`src/`）を変更した際に行います。（初回書き込み時）
 
 *   **VSCode**: 下部ツールバーの `→`（PlatformIO: Upload）をクリック。
-*   **CLI**: `pio run -t upload`
+*   **CLI**:
+    *   ESP8266: `pio run -e esp_wroom_02 -t upload`
+    *   M5Stack Core2: `pio run -e m5stack-core2 -t upload`
 
 ### 3.2 無線での書き込み (OTA - Over-The-Air)
 一度シリアルでファームウェアを書き込んだ後は、Wi-Fi経由での無線書き込み（OTA）が可能です。
-`platformio.ini` の以下の行のコメントアウトを外して有効化します：
+`platformio.ini` の対象 env で以下の行を有効化します：
 
 ```ini
 ; OTAアップロード時は下の2行を有効化してupload_speedをコメントアウト
 upload_protocol = espota
 upload_port = smoker.local    ; または IPアドレスを指定
 ```
-この状態で、通常の Upload を実行すると無線で書き込まれます。
+この状態で、対象 env を指定して Upload を実行すると無線で書き込まれます。
 
 ### 3.3 WebUIデータの書き込み (Filesystem Image)
 `data/` フォルダ内のファイル（HTML, CSS, JS, manifest.json 等）を更新した際に行います。**通常のアップロードでは更新されないため注意してください。**
 
 *   **VSCode**:
     1.  PlatformIO アイコンをクリック。
-    2.  `PROJECT TASKS` > `esp_wroom_02` > `Platform` を開く。
+    2.  `PROJECT TASKS` > 対象env (`esp_wroom_02` または `m5stack-core2`) > `Platform` を開く。
     3.  **`Upload Filesystem Image`** を実行。
-*   **CLI**: `pio run -t uploadfs`
+*   **CLI**:
+    *   ESP8266: `pio run -e esp_wroom_02 -t uploadfs`
+    *   M5Stack Core2: `pio run -e m5stack-core2 -t uploadfs`
 
 
 ---
@@ -82,11 +102,25 @@ upload_port = smoker.local    ; または IPアドレスを指定
 ## 4. パーティション構成
 
 `platformio.ini` で以下の通り設定されています：
-*   **Flash容量**: 2MB
-*   **ファイルシステム**: LittleFS (約256KB)
-*   **LD Script**: `eagle.flash.2m256.ld`
+*   **ESP8266 (esp_wroom_02)**:
+    *   Flash容量: 2MB
+    *   ファイルシステム: LittleFS (約256KB)
+    *   LD Script: `eagle.flash.2m256.ld`
+*   **ESP32 (m5stack-core2)**:
+    *   ボード定義の標準パーティションを利用
 
 WebUIのファイルサイズやログの保存上限を変更する際は、LittleFSの残り容量に注意してください。
+
+---
+
+## 7. ボード別ピン定義
+
+MAX6675 のピン定義は [include/hardware_pins.h](../include/hardware_pins.h) で管理します。
+
+*   ESP8266: 既存配線 (D0/D5/D6)
+*   M5Stack Core2: 外付け配線用の GPIO を使用
+
+実機配線に合わせて、Core2 側の定数を編集してください。
 
 ---
 

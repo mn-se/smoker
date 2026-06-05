@@ -1,6 +1,6 @@
 # Smoker
 
-ESP8266 (ESP-WROOM-02) を使用して、ネットワーク経由で対象デバイス（スマートプラグなど）のON/OFFを制御するプロジェクトです。
+ESP8266 または ESP32 (M5Stack Core2) を使用して、ネットワーク経由で対象デバイス（スマートプラグなど）のON/OFFを制御するプロジェクトです。
 
 ## 概要
 
@@ -8,8 +8,8 @@ ESP8266 (ESP-WROOM-02) を使用して、ネットワーク経由で対象デバ
 
 ## 環境構築
 
-- **Platform**: Espressif 8266
-- **Board**: ESP-WROOM-02
+- **Platform**: Espressif 8266 / Espressif 32
+- **Board**: ESP-WROOM-02 / M5Stack Core2
 - **Framework**: Arduino
 - **Development Environment**: PlatformIO
 
@@ -17,12 +17,22 @@ ESP8266 (ESP-WROOM-02) を使用して、ネットワーク経由で対象デバ
 
 1. リポジトリをクローンします。
 2. PlatformIOがインストールされたVSCode等のエディタでプロジェクトを開きます。
-3. `src/main.cpp` などの設定ファイル（Wi-FiのSSID、パスワード、ターゲットIPなど）を環境に合わせて変更してください。
-4. ESP8266をPCに接続し、ビルドおよび書き込み（Upload）を実行します。
+3. include/secrets.h などの設定ファイル（Wi-FiのSSID、パスワード、ターゲットIPなど）を環境に合わせて変更してください。
+4. MAX6675 の配線ピンを include/hardware_pins.h で確認・調整してください。
+5. ボードに応じて環境を指定してビルド/書き込みを実行します。
+
+### ビルド例
+
+- ESP8266: pio run -e esp_wroom_02
+- M5Stack Core2: pio run -e m5stack-core2
+
+### 書き込み例
+
+- ESP8266: pio run -e esp_wroom_02 -t upload
+- M5Stack Core2: pio run -e m5stack-core2 -t upload
 
 ## 依存ライブラリ
-- `ESP8266WiFi`
-- `ESP8266HTTPClient`
+- ArduinoJson
 
 ## ライセンス
 

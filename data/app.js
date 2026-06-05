@@ -324,6 +324,78 @@ async function loadCurrentLog() {
     } catch (err) { console.error('Failed to load current log:', err); }
 }
 
+// --- Real-time chart recovery from /log ---
+function parseLogToRT(csv) {
+    const lines = csv.split('\n');
+    const rows = [];
+    lines.forEach(line => {
+        line = line.trim();
+        if (!line) return;
+        if (line.startsWith('#')) return;
+        if (line.startsWith('Timestamp')) return;
+        const parts = line.split(',');
+        if (parts.length < 3) return;
+        const ts = parseInt(parts[0]); // millis since boot
+        const curr = parseFloat(parts[1]);
+        const tgt = parseFloat(parts[2]);
+        if (!isNaN(curr)) rows.push({ ts, curr, tgt });
+    });
+    if (rows.length === 0) return null;
+
+    // Estimate logging interval from median delta
+    let intervalMs = 60000;
+    if (rows.length >= 2) {
+        const deltas = [];
+        for (let i = 1; i < rows.length; i++) deltas.push(rows[i].ts - rows[i-1].ts);
+        deltas.sort((a,b) => a-b);
+        intervalMs = deltas[Math.floor(deltas.length/2)] || intervalMs;
+        if (intervalMs <= 0) intervalMs = 60000;
+    }
+
+    // Number of log entries to cover ~30 minutes
+    const entriesFor30min = Math.max(1, Math.floor((30*60*1000) / intervalMs));
+    const slice = rows.slice(-entriesFor30min);
+
+    const labels = [];
+    const currData = [];
+    const tgtData = [];
+    const now = Date.now();
+    for (let i = 0; i < slice.length; i++) {
+        const timeOffset = (slice.length - 1 - i) * intervalMs;
+        const labelTime = new Date(now - timeOffset);
+        labels.push(formatTime(labelTime));
+        currData.push(slice[i].curr);
+        tgtData.push(isNaN(slice[i].tgt) ? null : slice[i].tgt);
+    }
+    return { labels, currData, tgtData };
+}
+
+async function fetchAndRebuildRT() {
+    try {
+        const resp = await fetch(`${API_BASE}/log`);
+        if (!resp.ok) return;
+        const csv = await resp.text();
+        const parsed = parseLogToRT(csv);
+        if (!parsed) return;
+
+        rtData.labels = parsed.labels.slice();
+        rtData.datasets[0].data = parsed.currData.slice();
+        rtData.datasets[1].data = parsed.tgtData.slice();
+        tempChart.update();
+    } catch (err) {
+        console.error('Failed to rebuild RT from log:', err);
+    }
+}
+
+// Rebuild realtime chart when page becomes visible again
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+        fetchAndRebuildRT();
+        fetchStatus();
+    }
+});
+window.addEventListener('focus', () => { fetchAndRebuildRT(); fetchStatus(); });
+
 document.getElementById('btn-import-trigger').addEventListener('click', () => {
     document.getElementById('input-import-log').click();
 });
@@ -346,9 +418,12 @@ document.getElementById('btn-clear-log').addEventListener('click', async () => {
 
 fetchConfig().then(() => {
     loadCurrentLog().then(() => {
-        fetchStatus();
-        setInterval(fetchStatus, 3000);
-        // Refresh history viewer every 5 minutes
-        setInterval(loadCurrentLog, 300000);
+        // Rebuild realtime view from persisted log, then start polling
+        fetchAndRebuildRT().then(() => {
+            fetchStatus();
+            setInterval(fetchStatus, 3000);
+            // Refresh history viewer every 5 minutes
+            setInterval(loadCurrentLog, 300000);
+        });
     });
 });
