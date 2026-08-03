@@ -20,6 +20,10 @@
 
 #include "../include/config.h"
 
+#if defined(ARDUINO_ARCH_ESP32)
+#include <M5Unified.h>
+#endif
+
 // --- 設定構造体 ---
 struct Config {
     String ssid;
@@ -61,10 +65,76 @@ DNSServer dnsServer;
 bool isAPMode    = false;
 bool wifiConnected = false;
 
+#if defined(ARDUINO_ARCH_ESP32)
+unsigned long lastDisplayUpdateMs = 0;
+#endif
+
 // --- 前方宣言 ---
 void loadConfig(Config& config);
 void validateConfig(Config& config);
 void initModules(const Config& config);
+
+#if defined(ARDUINO_ARCH_ESP32)
+void initCore2Display();
+void updateCore2Display();
+#endif
+
+#if defined(ARDUINO_ARCH_ESP32)
+void initCore2Display() {
+    auto cfg = M5.config();
+    M5.begin(cfg);
+    M5.Display.setRotation(1);
+    M5.Display.setTextColor(WHITE, BLACK);
+    M5.Display.setTextSize(2);
+    M5.Display.clear(BLACK);
+    M5.Display.setCursor(8, 8);
+    M5.Display.println("Smoker Controller");
+}
+
+void updateCore2Display() {
+    const unsigned long now = millis();
+    if (now - lastDisplayUpdateMs < 1000) return;
+    lastDisplayUpdateMs = now;
+
+    float temp = tempControl.getCurrentTemp();
+    int heaterState = tempControl.getHeaterState();
+
+    M5.Display.clear(BLACK);
+    M5.Display.setTextSize(2);
+    M5.Display.setCursor(8, 8);
+    M5.Display.println("Smoker Status");
+
+    M5.Display.setCursor(8, 48);
+    if (temp <= -999.0f) {
+        M5.Display.setTextColor(YELLOW, BLACK);
+        M5.Display.println("Temp: N/A");
+        M5.Display.setCursor(8, 78);
+        M5.Display.println("Thermocouple");
+        M5.Display.setCursor(8, 108);
+        M5.Display.println("NOT CONNECTED");
+    } else {
+        M5.Display.setTextColor(CYAN, BLACK);
+        M5.Display.printf("Temp: %.2f C\n", temp);
+        M5.Display.setTextColor(WHITE, BLACK);
+        M5.Display.setCursor(8, 78);
+        M5.Display.println("Thermocouple: OK");
+    }
+
+    M5.Display.setCursor(8, 150);
+    if (heaterState == 1) {
+        M5.Display.setTextColor(GREEN, BLACK);
+        M5.Display.println("Meross Power: ON");
+    } else if (heaterState == 0) {
+        M5.Display.setTextColor(RED, BLACK);
+        M5.Display.println("Meross Power: OFF");
+    } else {
+        M5.Display.setTextColor(LIGHTGREY, BLACK);
+        M5.Display.println("Meross Power: UNKNOWN");
+    }
+
+    M5.Display.setTextColor(WHITE, BLACK);
+}
+#endif
 
 // ============================================================
 void loadConfig(Config& config) {
@@ -128,6 +198,10 @@ void setup() {
     Serial.begin(115200);
     Serial.println("ESP8266 Smoker Controller v1.0");
     Serial.println("==============================");
+
+#if defined(ARDUINO_ARCH_ESP32)
+    initCore2Display();
+#endif
 
     randomSeed(analogRead(SMOKER_RANDOM_SEED_PIN));
 
@@ -202,10 +276,17 @@ void loop() {
     MDNS.update();
 #endif
 
+#if defined(ARDUINO_ARCH_ESP32)
+    M5.update();
+#endif
+
     if (isAPMode) {
         dnsServer.processNextRequest();
         coreServer.handle();
         serialCmd.processInput();
+#if defined(ARDUINO_ARCH_ESP32)
+        updateCore2Display();
+#endif
         delay(10);
         return;
     }
@@ -214,5 +295,8 @@ void loop() {
     tempControl.update();
     coreServer.handle();
     serialCmd.processInput();
+#if defined(ARDUINO_ARCH_ESP32)
+    updateCore2Display();
+#endif
     delay(10);
 }

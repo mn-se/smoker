@@ -40,10 +40,11 @@ constexpr unsigned long TEMP_UPDATE_INTERVAL_MS = 5000;
 constexpr float TEMP_ERROR_THRESHOLD = -500.0f;
 
 // --- PID Control Parameters ---
-constexpr float PID_KP = 6.0f;
-constexpr float PID_KI = 0.02f;
-constexpr float PID_KD = 8.0f;
-constexpr unsigned long PWM_WINDOW_SIZE_MS = 120000; // 2 minutes
+constexpr float PID_KP = 4.2f;
+constexpr float PID_KI = 0.008f;
+constexpr float PID_KD = 14.0f;
+constexpr unsigned long PWM_WINDOW_SIZE_MS = 60000; // 60 seconds
+constexpr float PID_INTEGRAL_CLAMP = 350.0f;
 
 // --- NTP Configuration ---
 constexpr const char* NTP_SERVER = "pool.ntp.org";

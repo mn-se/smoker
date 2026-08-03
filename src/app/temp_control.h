@@ -26,6 +26,7 @@ public:
     float getKi() { return _Ki; }
     float getKd() { return _Kd; }
     unsigned long getWindowSize() { return _windowSize; }
+    int getHeaterState();
 private:
     MAX6675Module& _max6675;
     MerossControlModule& _meross;

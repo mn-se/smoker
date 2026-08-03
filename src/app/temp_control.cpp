@@ -83,8 +83,8 @@ void TempControlModule::update() {
         _integral += error * dt;
         
         // Anti-windup
-        if (_integral > 1000.0) _integral = 1000.0;
-        else if (_integral < -1000.0) _integral = -1000.0;
+        if (_integral > PID_INTEGRAL_CLAMP) _integral = PID_INTEGRAL_CLAMP;
+        else if (_integral < -PID_INTEGRAL_CLAMP) _integral = -PID_INTEGRAL_CLAMP;
 
         float dError = (error - _lastError) / dt;
         _lastError = error;
@@ -146,4 +146,8 @@ ControlState TempControlModule::getState() {
 
 float TempControlModule::getCurrentTemp() {
     return _max6675.readTempC();
+}
+
+int TempControlModule::getHeaterState() {
+    return _heaterState;
 }
