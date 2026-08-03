@@ -1,28 +1,26 @@
 # Smoker Pro 開発・保守ガイド
 
-このドキュメントでは、Smoker Pro のビルド環境の設定、プログラムの書き込み、およびメンテナンス方法について説明します。
+このガイドでは、M5Stack Core2 上で動作する Smoker Pro のビルド手順、書き込み手順、保守方法を説明します。
 
 ---
 
 ## 1. 開発環境
 
-本プロジェクトは **PlatformIO** を使用して開発されています。
+本プロジェクトは PlatformIO を使って開発されています。
 
-*   **IDE**: Visual Studio Code + PlatformIO IDE 拡張機能
-*   **Framework**: Arduino
-*   **Platform**: espressif8266 / espressif32
-*   **Board**:
-    *   ESP-WROOM-02 (ESP8266)
-    *   M5Stack Core2 (ESP32)
+- IDE: Visual Studio Code + PlatformIO IDE 拡張機能
+- Framework: Arduino
+- Platform: Espressif 32
+- Board: M5Stack Core2
 
 ---
 
 ## 2. セットアップと機密情報の管理
 
-セキュリティのため、Wi-Fiパスワードなどの機密情報は `include/secrets.h` に分離されています。このファイルは Git 管理から除外されています。
+セキュリティのため、Wi-Fi の認証情報などの機密値は include/secrets.h に保存し、Git では管理しません。
 
-### `include/secrets.h` の作成
-ビルド前に、`include/secrets.h` を以下の内容で作成してください：
+### include/secrets.h の作成
+ビルド前に、以下の内容で include/secrets.h を作成してください。
 
 ```cpp
 #ifndef SECRETS_H
@@ -37,10 +35,10 @@
 #endif
 ```
 
-※ このファイルが存在しない場合、空文字としてコンパイルされ、デバイスは自動的に「セットアップモード（APモード）」で起動します。
+このファイルがない場合は空値が使われ、デバイスはセットアップモードで起動します。
 
-### Merossプラグ情報の自動取得・上書き (オプション)
-`secrets.h` に記載したデフォルト値を使わず、後から認証情報を更新したい場合は、Wi-Fi接続後に以下の付属スクリプトを実行してESP8266内の設定（EEPROM）を上書きできます。
+### Meross 認証情報を後から更新する
+後から認証情報を更新したい場合は、デバイスをネットワークに接続した状態で、付属スクリプトを実行して保存内容を書き換えます。
 
 ```bash
 python tools/meross_mss305.py <Merossの登録メールアドレス> <Merossのパスワード>
@@ -50,98 +48,71 @@ python tools/meross_mss305.py <Merossの登録メールアドレス> <Merossの�
 
 ## 3. 書き込み手順
 
-ESP8266 / ESP32 には「プログラム（バイナリ）」と「WebUIデータ（ファイルシステム）」の **2種類** を書き込む必要があります。
+ファームウェアと Web UI のファイルシステム画像の両方をデバイスに書き込む必要があります。
 
-### 3.0 ビルド環境の選択
-
-PlatformIO の env を明示して実行してください。
-
-*   ESP8266: `esp_wroom_02`
-*   M5Stack Core2: `m5stack-core2`
-
-例:
+### 3.1 ファームウェアをビルドする
+Core2 用の環境を明示して実行します。
 
 ```bash
-pio run -e esp_wroom_02
 pio run -e m5stack-core2
 ```
 
-### 3.1 プログラムの書き込み (Firmware - シリアル接続)
-ソースコード（`src/`）を変更した際に行います。（初回書き込み時）
+### 3.2 プログラム書き込み（シリアル接続）
+初回書き込みやソースコード変更時に使用します。
 
-*   **VSCode**: 下部ツールバーの `→`（PlatformIO: Upload）をクリック。
-*   **CLI**:
-    *   ESP8266: `pio run -e esp_wroom_02 -t upload`
-    *   M5Stack Core2: `pio run -e m5stack-core2 -t upload`
+- VS Code: PlatformIO の Upload ボタンを押します。
+- CLI: pio run -e m5stack-core2 -t upload
 
-### 3.2 無線での書き込み (OTA - Over-The-Air)
-一度シリアルでファームウェアを書き込んだ後は、Wi-Fi経由での無線書き込み（OTA）が可能です。
-`platformio.ini` の対象 env で以下の行を有効化します：
+### 3.3 無線書き込み（OTA）
+一度シリアルで書き込んだ後は、Wi-Fi 経由で OTA 更新が可能です。Core2 用 env で次の設定を有効にします。
 
 ```ini
-; OTAアップロード時は下の2行を有効化してupload_speedをコメントアウト
 upload_protocol = espota
-upload_port = smoker.local    ; または IPアドレスを指定
+upload_port = smoker.local    ; または IP アドレス
 ```
-この状態で、対象 env を指定して Upload を実行すると無線で書き込まれます。
 
-### 3.3 WebUIデータの書き込み (Filesystem Image)
-`data/` フォルダ内のファイル（HTML, CSS, JS, manifest.json 等）を更新した際に行います。**通常のアップロードでは更新されないため注意してください。**
+その状態で Upload を実行すると無線更新できます。
 
-*   **VSCode**:
-    1.  PlatformIO アイコンをクリック。
-    2.  `PROJECT TASKS` > 対象env (`esp_wroom_02` または `m5stack-core2`) > `Platform` を開く。
-    3.  **`Upload Filesystem Image`** を実行。
-*   **CLI**:
-    *   ESP8266: `pio run -e esp_wroom_02 -t uploadfs`
-    *   M5Stack Core2: `pio run -e m5stack-core2 -t uploadfs`
+### 3.4 Web UI のファイルシステムイメージをアップロードする
+data/ 配下のファイルを更新した場合は、通常のファームウェア書き込みでは反映されないため、ファイルシステムイメージを別途アップロードします。
 
+- VS Code:
+  1. PlatformIO のタスクを開きます。
+  2. m5stack-core2 環境を選びます。
+  3. Upload Filesystem Image を実行します。
+- CLI: pio run -e m5stack-core2 -t uploadfs
 
 ---
 
 ## 4. パーティション構成
 
-`platformio.ini` で以下の通り設定されています：
-*   **ESP8266 (esp_wroom_02)**:
-    *   Flash容量: 2MB
-    *   ファイルシステム: LittleFS (約256KB)
-    *   LD Script: `eagle.flash.2m256.ld`
-*   **ESP32 (m5stack-core2)**:
-    *   ボード定義の標準パーティションを利用
-
-WebUIのファイルサイズやログの保存上限を変更する際は、LittleFSの残り容量に注意してください。
+Core2 環境では ESP32 ボード定義の標準パーティション構成を使用します。Web UI とログ保存に LittleFS 領域を使うため、容量を意識して管理してください。
 
 ---
 
-## 7. ボード別ピン定義
+## 5. ボード別ピン定義
 
-MAX6675 のピン定義は [include/hardware_pins.h](../include/hardware_pins.h) で管理します。
-
-*   ESP8266: 既存配線 (D0/D5/D6)
-*   M5Stack Core2: 外付け配線用の GPIO を使用
-
-実機配線に合わせて、Core2 側の定数を編集してください。
+MAX6675 のピン定義は include/hardware_pins.h で管理しています。実際の配線に合わせて Core2 側の定数を調整してください。
 
 ---
 
-## 5. デバッグとシリアルモニタ
+## 6. デバッグとシリアルモニタ
 
-動作確認やエラー診断には、シリアルモニタを使用します。
+動作確認や不具合解析にはシリアルモニタを使います。
 
-*   **通信速度**: 115200 bps
-*   **主な確認項目**:
-    *   起動時のWi-Fi接続状況
-    *   Merossプラグへの通信成否
-    *   MAX6675 センサーの読み取り値
-    *   PID制御の計算値（ヒーターのON/OFFタイミング）
+- 通信速度: 115200 bps
+- 確認項目:
+  - 起動時の Wi-Fi 接続状態
+  - Meross プラグとの通信状態
+  - MAX6675 センサーの読み取り値
+  - PID 制御の計算結果とヒーターの ON/OFF タイミング
 
 ---
 
-## 6. WebUIのキャッシュ制御について
+## 7. Web UI のキャッシュ制御
 
-本プロジェクトは PWA (Service Worker) を導入しているため、WebUIを更新してもブラウザに古い画面が残る場合があります。
+ブラウザ側に古い Web UI が残ることがあるため、更新後はキャッシュを確認してください。
 
-ファイルを更新した後は、ブラウザ側で以下の操作を行ってください：
-1. `Upload Filesystem Image` を完了させる。
-2. スマホブラウザで `http://smoker.local` を開き、リフレッシュ。
-3. 反映されない場合は、ブラウザ設定からサイトデータ（smoker.local）の削除・キャッシュのクリアを行ってください。
+1. Upload Filesystem Image を完了させます。
+2. ブラウザで http://smoker.local を開き、リロードします。
+3. 反映されない場合は、smoker.local のサイトデータやキャッシュを削除してください。

@@ -1,25 +1,23 @@
 # Smoker Pro Development and Maintenance Guide
 
-This document explains how to set up the build environment, flash the firmware, and maintain the Smoker Pro project.
+This guide covers the build setup, flashing procedure, and maintenance workflow for the Smoker Pro project running on the M5Stack Core2.
 
 ---
 
 ## 1. Development environment
 
-This project is built with PlatformIO.
+This project is built with PlatformIO and targets the M5Stack Core2 hardware.
 
 - IDE: Visual Studio Code + PlatformIO IDE extension
 - Framework: Arduino
-- Platform: espressif8266 / espressif32
-- Boards:
-  - ESP-WROOM-02 (ESP8266)
-  - M5Stack Core2 (ESP32)
+- Platform: Espressif 32
+- Board: M5Stack Core2
 
 ---
 
 ## 2. Setup and management of sensitive information
 
-For security reasons, sensitive information such as Wi-Fi passwords is stored separately in include/secrets.h. This file is excluded from Git.
+For security reasons, sensitive values such as Wi-Fi credentials are stored in include/secrets.h and are not tracked by Git.
 
 ### Create include/secrets.h
 Before building, create include/secrets.h with the following content:
@@ -37,10 +35,10 @@ Before building, create include/secrets.h with the following content:
 #endif
 ```
 
-If this file does not exist, empty strings will be used during compilation, and the device will start in setup mode (AP mode).
+If this file is missing, empty values are used and the device starts in setup mode.
 
-### Optional: overwrite Meross plug credentials later
-If you want to update the credentials later instead of using the defaults in secrets.h, connect to Wi-Fi and run the provided script to overwrite the ESP8266 configuration stored in EEPROM.
+### Optional: overwrite Meross credentials later
+If you want to update the credentials later, connect the device to the network and run the provided script to rewrite the stored configuration.
 
 ```bash
 python tools/meross_mss305.py <Meross registered email> <Meross password>
@@ -50,85 +48,60 @@ python tools/meross_mss305.py <Meross registered email> <Meross password>
 
 ## 3. Flashing procedure
 
-The ESP8266 / ESP32 requires two kinds of data to be written:
-- firmware binary
-- Web UI filesystem image
+The firmware and the Web UI filesystem must both be written to the device.
 
-### 3.0 Select the build environment
-Use the target PlatformIO environment explicitly.
-
-- ESP8266: esp_wroom_02
-- M5Stack Core2: m5stack-core2
-
-Examples:
+### 3.1 Build the firmware
+Use the Core2 environment explicitly:
 
 ```bash
-pio run -e esp_wroom_02
 pio run -e m5stack-core2
 ```
 
-### 3.1 Flash firmware (serial connection)
-This is used when changing source files in src/ or for the initial flash.
+### 3.2 Flash firmware (serial connection)
+This is used for the initial flash or when changing source files in src/.
 
-- VS Code: click the PlatformIO Upload button (arrow icon).
+- VS Code: click the PlatformIO Upload button.
 - CLI:
-  - ESP8266: pio run -e esp_wroom_02 -t upload
   - M5Stack Core2: pio run -e m5stack-core2 -t upload
 
-### 3.2 OTA (Over-The-Air) flashing
-After the firmware has been flashed once via serial, OTA updates can be used over Wi-Fi.
-Enable the following lines in platformio.ini for the target environment:
+### 3.3 OTA (Over-The-Air) flashing
+After the firmware has been flashed once, OTA updates can be used over Wi-Fi.
+Enable the following lines in platformio.ini for the Core2 environment:
 
 ```ini
-; OTA upload settings
 upload_protocol = espota
 upload_port = smoker.local    ; or specify an IP address
 ```
 
 Then run Upload for the target environment to flash over the air.
 
-### 3.3 Upload Web UI filesystem image
-When updating files in the data/ directory (HTML, CSS, JS, manifest.json, etc.), you must upload the filesystem image separately because normal firmware uploads do not update it.
+### 3.4 Upload the Web UI filesystem image
+When updating files in the data/ directory, upload the filesystem image separately because normal firmware uploads do not update it.
 
 - VS Code:
   1. Open PlatformIO tasks.
-  2. Open the target environment (esp_wroom_02 or m5stack-core2).
+  2. Open the m5stack-core2 environment.
   3. Run Upload Filesystem Image.
 - CLI:
-  - ESP8266: pio run -e esp_wroom_02 -t uploadfs
   - M5Stack Core2: pio run -e m5stack-core2 -t uploadfs
 
 ---
 
 ## 4. Partition layout
 
-The partition configuration is set in platformio.ini as follows:
-
-- ESP8266 (esp_wroom_02):
-  - Flash size: 2MB
-  - Filesystem: LittleFS (about 256KB)
-  - LD script: eagle.flash.2m256.ld
-- ESP32 (m5stack-core2):
-  - Uses the board’s default partition layout
-
-Be mindful of available LittleFS space when changing the size of the Web UI or log data.
+The Core2 environment uses the board’s default ESP32 partition layout. The Web UI and stored logs rely on LittleFS space, so keep the data size reasonable.
 
 ---
 
 ## 5. Board-specific pin definitions
 
-MAX6675 pin mappings are managed in include/hardware_pins.h.
-
-- ESP8266: existing wiring (D0 / D5 / D6)
-- M5Stack Core2: GPIO pins for external wiring
-
-Adjust the Core2 constants as needed to match your hardware wiring.
+MAX6675 pin mappings are managed in include/hardware_pins.h. Adjust the Core2 pin constants as needed to match the actual wiring.
 
 ---
 
 ## 6. Debugging and serial monitor
 
-Use the serial monitor to verify operation and diagnose errors.
+Use the serial monitor to verify operation and diagnose issues.
 
 - Baud rate: 115200 bps
 - Key items to check:
@@ -141,9 +114,9 @@ Use the serial monitor to verify operation and diagnose errors.
 
 ## 7. Web UI cache control
 
-Because this project uses PWA / Service Worker behavior, browser caches may retain an older version of the Web UI.
+Because the project uses a browser-based UI, cached files may remain visible after updates.
 
 After updating files:
-1. Complete Upload Filesystem Image.
+1. Run Upload Filesystem Image.
 2. Open http://smoker.local in your browser and refresh.
-3. If the changes still do not appear, clear the site data/cache for smoker.local.
+3. If the changes are still not visible, clear the site data or cache for smoker.local.
