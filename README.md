@@ -21,6 +21,15 @@ ESP8266 または ESP32 (M5Stack Core2) を使用して、ネットワーク経�
 4. MAX6675 の配線ピンを include/hardware_pins.h で確認・調整してください。
 5. ボードに応じて環境を指定してビルド/書き込みを実行します。
 
+## ドキュメント
+
+- 日本語
+  - [ユーザーマニュアル](doc/USER_MANUAL.md)
+  - [ビルド・保守ガイド](doc/BUILD_GUIDE.md)
+- English
+  - [User Manual](doc/USER_MANUAL.en.md)
+  - [Build Guide](doc/BUILD_GUIDE.en.md)
+
 ### ビルド例
 
 - ESP8266: pio run -e esp_wroom_02
