@@ -95,6 +95,7 @@ void AppAPI::handleStatus() {
         (state == ERROR_STATE)  ? "error"         : "monitoring";
     doc["state"]       = stateStr;
     doc["temperature"] = _tempControl.getCurrentTemp();
+    doc["heater_state"] = _tempControl.getHeaterState();
     String response;
     serializeJson(doc, response);
     _core.sendJson(200, response);

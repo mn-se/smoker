@@ -67,6 +67,161 @@ bool wifiConnected = false;
 
 #if defined(ARDUINO_ARCH_ESP32)
 unsigned long lastDisplayUpdateMs = 0;
+unsigned long lastBootDisplayUpdateMs = 0;
+bool dashboardLayoutDrawn = false;
+
+const char* controlStateLabel(ControlState state) {
+    switch (state) {
+        case IDLE:         return "IDLE";
+        case TEMP_CONTROL:  return "AUTO CONTROL";
+        case FORCE_ON:      return "FORCE ON";
+        case MONITORING:    return "MONITORING";
+        case ERROR_STATE:   return "ERROR";
+        default:            return "UNKNOWN";
+    }
+}
+
+uint16_t controlStateColor(ControlState state) {
+    switch (state) {
+        case IDLE:         return TFT_DARKGREY;
+        case TEMP_CONTROL:  return TFT_ORANGE;
+        case FORCE_ON:      return TFT_RED;
+        case MONITORING:    return TFT_CYAN;
+        case ERROR_STATE:   return TFT_RED;
+        default:            return TFT_LIGHTGREY;
+    }
+}
+
+const char* heaterStateLabel(int heaterState) {
+    if (heaterState == 1) return "ON";
+    if (heaterState == 0) return "OFF";
+    return "UNKNOWN";
+}
+
+const char* sensorStatusLabel(float temp) {
+    if (temp <= -999.0f) return "NO PROBE";
+    if (temp <= -998.0f) return "SHORT GND";
+    if (temp <= -997.0f) return "SHORT VCC";
+    if (temp <= -996.0f) return "OUT OF RANGE";
+    return "OK";
+}
+
+uint16_t heaterStateColor(int heaterState) {
+    if (heaterState == 1) return TFT_RED;
+    if (heaterState == 0) return TFT_GREEN;
+    return TFT_LIGHTGREY;
+}
+
+void drawInfoCard(int x, int y, int w, int h, const char* label, const char* value, uint16_t accentColor) {
+    M5.Display.fillRoundRect(x, y, w, h, 10, 0x1111);
+    M5.Display.drawRoundRect(x, y, w, h, 10, accentColor);
+
+    M5.Display.setTextColor(TFT_LIGHTGREY, 0x1111);
+    M5.Display.setTextSize(1);
+    M5.Display.setCursor(x + 10, y + 6);
+    M5.Display.print(label);
+
+    M5.Display.setTextColor(accentColor, 0x1111);
+    M5.Display.setTextSize(2);
+    M5.Display.setCursor(x + 10, y + 20);
+    M5.Display.print(value);
+}
+
+void drawBootScreen(const char* title, const char* line1, const char* line2, uint16_t accentColor) {
+    M5.Display.clear(BLACK);
+    M5.Display.setTextColor(WHITE, BLACK);
+    M5.Display.setTextSize(2);
+    M5.Display.setCursor(10, 8);
+    M5.Display.println("Smoker Controller");
+
+    M5.Display.fillRoundRect(10, 44, 300, 120, 12, 0x1111);
+    M5.Display.drawRoundRect(10, 44, 300, 120, 12, accentColor);
+
+    M5.Display.setTextColor(accentColor, 0x1111);
+    M5.Display.setTextSize(3);
+    M5.Display.setCursor(24, 62);
+    M5.Display.println(title);
+
+    M5.Display.setTextColor(TFT_WHITE, 0x1111);
+    M5.Display.setTextSize(2);
+    M5.Display.setCursor(24, 98);
+    M5.Display.println(line1);
+
+    M5.Display.setTextSize(1);
+    M5.Display.setTextColor(TFT_LIGHTGREY, 0x1111);
+    M5.Display.setCursor(24, 130);
+    M5.Display.println(line2);
+}
+
+void drawStartupDoneScreen() {
+    M5.Display.clear(BLACK);
+    M5.Display.fillScreen(TFT_RED);
+    M5.Display.setTextColor(TFT_WHITE, TFT_RED);
+    M5.Display.setTextSize(4);
+    M5.Display.setCursor(18, 28);
+    M5.Display.println("TEST");
+
+    M5.Display.setTextSize(3);
+    M5.Display.setCursor(18, 78);
+    M5.Display.println("SCREEN");
+
+    M5.Display.setTextSize(2);
+    M5.Display.setCursor(18, 126);
+    M5.Display.println("Switching now");
+}
+
+void drawStageScreen(const char* stage, const char* detail, uint16_t accentColor) {
+    M5.Display.clear(BLACK);
+    M5.Display.fillScreen(TFT_BLACK);
+    M5.Display.setTextColor(accentColor, BLACK);
+    M5.Display.setTextSize(4);
+    M5.Display.setCursor(18, 24);
+    M5.Display.println(stage);
+
+    M5.Display.setTextSize(2);
+    M5.Display.setTextColor(TFT_WHITE, BLACK);
+    M5.Display.setCursor(18, 88);
+    M5.Display.println(detail);
+}
+
+void drawDashboardLiveScreen() {
+    M5.Display.clear(BLACK);
+    M5.Display.fillScreen(BLACK);
+    M5.Display.setTextColor(TFT_WHITE, BLACK);
+    M5.Display.setTextSize(3);
+    M5.Display.setCursor(12, 10);
+    M5.Display.println("Smoker Dashboard");
+
+    M5.Display.setTextColor(TFT_DARKGREY, BLACK);
+    M5.Display.setTextSize(2);
+    M5.Display.setCursor(12, 44);
+    M5.Display.println("CURRENT TEMP");
+
+    M5.Display.setTextColor(TFT_CYAN, BLACK);
+    M5.Display.setTextSize(4);
+    M5.Display.setCursor(12, 66);
+    M5.Display.println("TEMP: --.- C");
+
+    M5.Display.setTextColor(TFT_ORANGE, BLACK);
+    M5.Display.setTextSize(2);
+    M5.Display.setCursor(12, 116);
+    M5.Display.println("TARGET: --.- C");
+
+    M5.Display.setTextColor(TFT_WHITE, BLACK);
+    M5.Display.setCursor(12, 146);
+    M5.Display.println("STATE: STARTING");
+
+    M5.Display.setCursor(12, 172);
+    M5.Display.println("HEATER: UNKNOWN");
+
+    M5.Display.setCursor(12, 198);
+    M5.Display.println("WIFI: OFFLINE");
+
+    M5.Display.setCursor(12, 224);
+    M5.Display.println("SENSOR: NO SIGNAL");
+
+    dashboardLayoutDrawn = true;
+}
 #endif
 
 // --- 前方宣言 ---
@@ -84,56 +239,88 @@ void initCore2Display() {
     auto cfg = M5.config();
     M5.begin(cfg);
     M5.Display.setRotation(1);
-    M5.Display.setTextColor(WHITE, BLACK);
-    M5.Display.setTextSize(2);
-    M5.Display.clear(BLACK);
-    M5.Display.setCursor(8, 8);
-    M5.Display.println("Smoker Controller");
+    drawBootScreen("BOOT", "Starting dashboard...", "Reading config and connecting to Wi-Fi", TFT_ORANGE);
 }
 
 void updateCore2Display() {
     const unsigned long now = millis();
     if (now - lastDisplayUpdateMs < 1000) return;
+
+    // MAX6675 CLK shares GPIO18 with the Core2 LCD's SPI clock. Skip the
+    // redraw for a short settle window right after a sensor read so the two
+    // never touch the pin back-to-back in the same instant.
+    if (now - tempControl.getLastSensorReadMs() < 300) return;
+
     lastDisplayUpdateMs = now;
 
-    float temp = tempControl.getCurrentTemp();
-    int heaterState = tempControl.getHeaterState();
-
-    M5.Display.clear(BLACK);
-    M5.Display.setTextSize(2);
-    M5.Display.setCursor(8, 8);
-    M5.Display.println("Smoker Status");
-
-    M5.Display.setCursor(8, 48);
-    if (temp <= -999.0f) {
-        M5.Display.setTextColor(YELLOW, BLACK);
-        M5.Display.println("Temp: N/A");
-        M5.Display.setCursor(8, 78);
-        M5.Display.println("Thermocouple");
-        M5.Display.setCursor(8, 108);
-        M5.Display.println("NOT CONNECTED");
-    } else {
-        M5.Display.setTextColor(CYAN, BLACK);
-        M5.Display.printf("Temp: %.2f C\n", temp);
-        M5.Display.setTextColor(WHITE, BLACK);
-        M5.Display.setCursor(8, 78);
-        M5.Display.println("Thermocouple: OK");
+    if (!dashboardLayoutDrawn) {
+        drawDashboardLiveScreen();
     }
 
-    M5.Display.setCursor(8, 150);
-    if (heaterState == 1) {
-        M5.Display.setTextColor(GREEN, BLACK);
-        M5.Display.println("Meross Power: ON");
-    } else if (heaterState == 0) {
-        M5.Display.setTextColor(RED, BLACK);
-        M5.Display.println("Meross Power: OFF");
+    const float currentTemp = tempControl.getCurrentTemp();
+    Serial.printf("[DISPLAY] currentTemp=%.2f (same value used by /status)\n", currentTemp);
+
+    float targetTemp = tempControl.getTargetTemp();
+    ControlState state = tempControl.getState();
+    int heaterState = tempControl.getHeaterState();
+    bool tempValid = currentTemp > -995.0f && currentTemp < 1000.0f;
+    bool wifiOk = wifiConnected;
+
+    const char* stateLabel = controlStateLabel(state);
+    const char* heaterLabel = heaterStateLabel(heaterState);
+    const char* wifiLabel = isAPMode ? "AP MODE" : (wifiOk ? "ONLINE" : "OFFLINE");
+    const char* sensorLabel = sensorStatusLabel(currentTemp);
+
+    M5.Display.fillRect(12, 66, 300, 38, BLACK);
+    if (tempValid) {
+        M5.Display.setTextColor(TFT_CYAN, BLACK);
+        M5.Display.setTextSize(4);
+        M5.Display.setCursor(12, 66);
+        M5.Display.printf("TEMP: %.1f C", currentTemp);
     } else {
-        M5.Display.setTextColor(LIGHTGREY, BLACK);
-        M5.Display.println("Meross Power: UNKNOWN");
+        M5.Display.setTextColor(TFT_RED, BLACK);
+        M5.Display.setTextSize(4);
+        M5.Display.setCursor(12, 66);
+        M5.Display.print("TEMP: --.- C");
+    }
+
+    M5.Display.setTextSize(2);
+    M5.Display.fillRect(12, 116, 300, 22, BLACK);
+    M5.Display.setTextColor(TFT_ORANGE, BLACK);
+    M5.Display.setCursor(12, 116);
+    M5.Display.printf("TARGET: %.1f C", targetTemp);
+
+    M5.Display.fillRect(12, 146, 300, 22, BLACK);
+    M5.Display.setTextColor(TFT_WHITE, BLACK);
+    M5.Display.setCursor(12, 146);
+    M5.Display.printf("STATE: %s", stateLabel);
+
+    M5.Display.fillRect(12, 172, 300, 22, BLACK);
+    M5.Display.setCursor(12, 172);
+    M5.Display.printf("HEATER: %s", heaterLabel);
+
+    M5.Display.fillRect(12, 198, 300, 22, BLACK);
+    M5.Display.setCursor(12, 198);
+    M5.Display.printf("WIFI: %s", wifiLabel);
+
+    M5.Display.fillRect(12, 224, 300, 22, BLACK);
+    M5.Display.setCursor(12, 224);
+    if (tempValid) {
+        M5.Display.printf("SENSOR: %s", sensorLabel);
+    } else {
+        M5.Display.printf("SENSOR: %s (%.0f)", sensorLabel, currentTemp);
     }
 
     M5.Display.setTextColor(WHITE, BLACK);
 }
+
+void updateBootDisplay(const char* title, const char* line1, const char* line2, uint16_t accentColor) {
+    const unsigned long now = millis();
+    if (now - lastBootDisplayUpdateMs < 500) return;
+    lastBootDisplayUpdateMs = now;
+    drawBootScreen(title, line1, line2, accentColor);
+}
+
 #endif
 
 // ============================================================
@@ -198,6 +385,7 @@ void setup() {
     Serial.begin(115200);
     Serial.println("ESP8266 Smoker Controller v1.0");
     Serial.println("==============================");
+    Serial.printf("MAX6675 pins -> CS:%d CLK:%d SO:%d\n", SMOKER_PIN_MAX6675_CS, SMOKER_PIN_MAX6675_CLK, SMOKER_PIN_MAX6675_SO);
 
 #if defined(ARDUINO_ARCH_ESP32)
     initCore2Display();
@@ -215,6 +403,12 @@ void setup() {
 
     unsigned long startTime = millis();
     while (WiFi.status() != WL_CONNECTED) {
+        const unsigned long elapsedSec = (millis() - startTime) / 1000;
+        char elapsedText[24];
+        snprintf(elapsedText, sizeof(elapsedText), "%lu sec elapsed", elapsedSec);
+#if defined(ARDUINO_ARCH_ESP32)
+        updateBootDisplay("CONNECTING", config.ssid.c_str(), elapsedText, TFT_ORANGE);
+#endif
         if (millis() - startTime > WIFI_TIMEOUT_MS) {
             Serial.println("\n[WARNING] WiFi connection failed! Starting AP Mode for Setup.");
             break;
@@ -228,6 +422,10 @@ void setup() {
         Serial.println("\nWiFi Connected!");
         Serial.printf("IP Address: %s\n", WiFi.localIP().toString().c_str());
 
+#if defined(ARDUINO_ARCH_ESP32)
+        drawBootScreen("ONLINE", WiFi.localIP().toString().c_str(), "Dashboard will start now", TFT_GREEN);
+#endif
+
         if (MDNS.begin("smoker")) {
             Serial.println("mDNS responder started: smoker.local");
         }
@@ -239,6 +437,10 @@ void setup() {
         Serial.println(WiFi.softAPIP());
         dnsServer.start(DNS_PORT, "*", WiFi.softAPIP());
         isAPMode = true;
+
+#if defined(ARDUINO_ARCH_ESP32)
+        drawBootScreen("AP MODE", "Connect to SMOKER-SETUP", WiFi.softAPIP().toString().c_str(), TFT_YELLOW);
+#endif
     }
 
     // --- LittleFS (WebUI) ---
@@ -248,19 +450,57 @@ void setup() {
         Serial.println("LittleFS Mounted Successfully.");
     }
 
+#if defined(ARDUINO_ARCH_ESP32)
+    drawStageScreen("LFS OK", "LittleFS mounted", TFT_CYAN);
+    delay(800);
+#endif
+
     // --- Core モジュール初期化 ---
     logModule.begin();
+
+#if defined(ARDUINO_ARCH_ESP32)
+    drawStageScreen("LOG OK", "Log module ready", TFT_CYAN);
+    delay(800);
+#endif
+
     appApi.registerRoutes();   // AppAPI のルートを先に登録
     coreServer.begin(isAPMode);
+
+#if defined(ARDUINO_ARCH_ESP32)
+    drawStageScreen("HTTP OK", "Web routes ready", TFT_CYAN);
+    delay(800);
+#endif
 
     if (wifiConnected) {
         ntp.begin();
         ota.begin("smoker");   // OTA はWiFi接続時のみ有効
+
+#if defined(ARDUINO_ARCH_ESP32)
+        drawStageScreen("OTA OK", "OTA ready", TFT_CYAN);
+        delay(800);
+#endif
     }
 
     // --- App モジュール初期化 ---
-    max6675.begin();
     initModules(config);
+
+#if defined(ARDUINO_ARCH_ESP32)
+    drawStageScreen("APP OK", "Modules configured", TFT_GREEN);
+    delay(800);
+#endif
+
+#if defined(ARDUINO_ARCH_ESP32)
+    drawStageScreen("SENSOR OK", "Switching to dashboard", TFT_GREEN);
+    delay(800);
+
+    drawDashboardLiveScreen();
+    delay(200);
+#endif
+
+#if defined(ARDUINO_ARCH_ESP32)
+    lastDisplayUpdateMs = 0;
+    updateCore2Display();
+#endif
 
     // --- 起動メッセージ ---
     Serial.println("\nSystem initialized successfully!");
@@ -282,6 +522,7 @@ void loop() {
 
     if (isAPMode) {
         dnsServer.processNextRequest();
+        tempControl.update();
         coreServer.handle();
         serialCmd.processInput();
 #if defined(ARDUINO_ARCH_ESP32)

@@ -3,7 +3,7 @@
 #include "AppConfig.h"
 
 TempControlModule::TempControlModule(MAX6675Module& max6675, MerossControlModule& meross, LogModule& logModule)
-    : _max6675(max6675), _meross(meross), _logModule(logModule), _state(IDLE), _targetTemp(0), _lastUpdate(0), _heaterState(-1),
+    : _max6675(max6675), _meross(meross), _logModule(logModule), _state(IDLE), _currentTemp(-999.0f), _targetTemp(0), _lastUpdate(0), _heaterState(0),
       _Kp(PID_KP), _Ki(PID_KI), _Kd(PID_KD), _integral(0), _lastError(0), _pidOutput(0), _windowSize(PWM_WINDOW_SIZE_MS), _windowStartTime(0) {
     // Override with saved config values if available
     AppConfig::readPIDConfig(_Kp, _Ki, _Kd, _windowSize);
@@ -54,18 +54,26 @@ void TempControlModule::stop() {
 }
 
 void TempControlModule::update() {
-    if (_state == IDLE || millis() - _lastUpdate < TEMP_UPDATE_INTERVAL_MS) return;
+    if (_lastUpdate != 0 && (millis() - _lastUpdate < TEMP_UPDATE_INTERVAL_MS)) return;
     _lastUpdate = millis();
 
     float temp = _max6675.readTempC();
+    _currentTemp = temp;
+
     if (temp < TEMP_ERROR_THRESHOLD) {
-        Serial.println("[ERROR] Temperature sensor reading failed. SAFETY CUT-OFF!");
-        _state = ERROR_STATE;
-        if (_meross.toggle(false)) {
-            _heaterState = 0;
+        if (_state != IDLE) {
+            Serial.println("[ERROR] Temperature sensor reading failed. SAFETY CUT-OFF!");
+            _state = ERROR_STATE;
+            if (_meross.toggle(false)) {
+                _heaterState = 0;
+            }
+            _logModule.logData(temp, _targetTemp, _heaterState); // Log data even on error
         }
-        _logModule.logData(temp, _targetTemp, _heaterState); // Log data even on error
         return; // Error
+    }
+
+    if (_state == IDLE) {
+        return;
     }
 
     if (_state == ERROR_STATE) {
@@ -145,7 +153,7 @@ ControlState TempControlModule::getState() {
 }
 
 float TempControlModule::getCurrentTemp() {
-    return _max6675.readTempC();
+    return _currentTemp;
 }
 
 int TempControlModule::getHeaterState() {

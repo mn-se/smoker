@@ -10,6 +10,7 @@ public:
     float readTempC();
 private:
     int _cs, _clk, _so;
+    bool _initialized = false;
     uint16_t readRaw();
 };
 

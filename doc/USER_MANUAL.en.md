@@ -12,6 +12,7 @@ When the device starts in a new environment, it will enter setup mode automatica
 2. Connect to the network named SMOKER-SETUP.
 3. Open your browser and go to http://192.168.4.1 if the setup page does not appear automatically.
 4. Enter your home Wi-Fi details and the Meross smart plug information, then press Save.
+  - If you want to skip manual Meross entry (UUID / KEY / IP), run `tools/meross_mss305.py` on your PC to fetch and apply them automatically. See [tools/README.md](../tools/README.md) for details.
 5. The device will restart and connect to your network.
 
 ---

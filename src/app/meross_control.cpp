@@ -22,10 +22,29 @@ bool MerossControlModule::toggle(bool onoff) {
         return false;
     }
 
+    if (_targetIp.length() == 0) {
+        Serial.println("[MEROSS] Target IP is empty. Configure /config/device first.");
+        return false;
+    }
+
     WiFiClient client;
     client.setTimeout(3000);
-    if (!client.connect(_targetIp.c_str(), 80)) {
-        Serial.printf("[MEROSS] Connection to %s failed\n", _targetIp.c_str());
+    bool connected = false;
+    for (int attempt = 1; attempt <= 3; attempt++) {
+        if (client.connect(_targetIp.c_str(), 80)) {
+            connected = true;
+            break;
+        }
+        Serial.printf("[MEROSS] Connection attempt %d/3 to %s failed\n", attempt, _targetIp.c_str());
+        client.stop();
+        delay(150);
+    }
+
+    if (!connected) {
+        Serial.printf("[MEROSS] Connection to %s failed. Check Meross local IP and network route.\n", _targetIp.c_str());
+        if (_targetIp == "192.168.0.2") {
+            Serial.println("[MEROSS] Hint: device IP may have changed by DHCP. Update /config/device.");
+        }
         return false;
     }
 
@@ -40,17 +59,31 @@ bool MerossControlModule::toggle(bool onoff) {
                  "Content-Length: " + body.length() + "\r\nConnection: close\r\nUser-Agent: okhttp/5.0.0-alpha.14\r\n\r\n" + body);
 
     unsigned long t = millis();
-    bool success = false;
-    while (client.connected() && millis() - t < 3000) {
-        if (client.available()) {
-            String line = client.readStringUntil('\n');
-            if (line.indexOf("\"method\":") > -1) {
-                success = line.indexOf("SETACK") > -1;
-                Serial.printf("[MEROSS] Toggle %s: %s\n", onoff ? "ON" : "OFF", success ? "SUCCESS" : "FAILED");
-                break;
-            }
+    String response = "";
+    while (millis() - t < 3500) {
+        while (client.available()) {
+            response += (char)client.read();
+            t = millis();
         }
+        if (!client.connected()) {
+            break;
+        }
+        delay(2);
     }
+
+    bool okHttp = response.indexOf("200 OK") > -1;
+    bool okAck = response.indexOf("SETACK") > -1;
+    bool okCode = response.indexOf("\"code\":0") > -1 || response.indexOf("\"code\": 0") > -1;
+    bool success = okHttp && (okAck || okCode);
+
+    Serial.printf("[MEROSS] Toggle %s: %s\n", onoff ? "ON" : "OFF", success ? "SUCCESS" : "FAILED");
+    if (!success) {
+        String head = response.substring(0, 220);
+        head.replace("\r", " ");
+        head.replace("\n", " ");
+        Serial.printf("[MEROSS] Response(head): %s\n", head.c_str());
+    }
+
     client.stop();
     return success;
 }

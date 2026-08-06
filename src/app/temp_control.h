@@ -21,6 +21,7 @@ public:
     void update();
     ControlState getState();
     float getCurrentTemp();
+    unsigned long getLastSensorReadMs() { return _lastUpdate; }
     float getTargetTemp() { return _targetTemp; }
     float getKp() { return _Kp; }
     float getKi() { return _Ki; }
@@ -32,6 +33,7 @@ private:
     MerossControlModule& _meross;
     LogModule& _logModule; // Reference to LogModule
     ControlState _state;
+    float _currentTemp;
     float _targetTemp;
     unsigned long _lastUpdate;
     int _heaterState;
