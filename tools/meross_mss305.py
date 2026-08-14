@@ -39,7 +39,7 @@ def _collect_ip_candidates(dev):
             uniq.append(ip)
     return uniq
 
-async def main(email, password):
+async def main(email, password, controller_url):
     print("Merossクラウドにログイン中...")
     api_base_url = "https://iot.meross.com"
     dummy_creds = MerossCloudCreds(user_id="", user_email=email, issued_on=datetime.now().isoformat(), domain=api_base_url, mqtt_domain="", token="", key="")
@@ -113,7 +113,7 @@ async def main(email, password):
         ip_val = input("\nプラグのIPアドレスを手動で入力してください (例: 192.168.0.2): ")
         
     # コントローラへの無線送信
-    esp_url = "http://smoker.local/config/device"
+    esp_url = f"{controller_url.rstrip('/')}/config/device"
     payload = {
         "uuid": uuid_val,
         "key": key_val,
@@ -127,8 +127,8 @@ async def main(email, password):
             print("✨ 完了！シリアル接続なしでコントローラにキーが記憶されました！")
         else:
             print(f"❌ 失敗: コントローラがエラーを返しました ({response.status_code})\n詳細: {response.text}")
-    except Exception as e:
-        print(f"❌ 通信エラー: コントローラが見つかりません。")
+    except requests.RequestException as e:
+        print(f"❌ 通信エラー: コントローラに接続できません ({e})")
         print("  ・コントローラの電源が入っているか\n  ・PCと同じWi-Fiネットワークに繋がっているかを確認してください。")
 
 if __name__ == '__main__':
@@ -146,8 +146,16 @@ if __name__ == '__main__':
     )
     parser.add_argument("email", metavar="email", help="Merossアカウントのメールアドレス")
     parser.add_argument("password", metavar="password", help="Merossアカウントのパスワード")
+    parser.add_argument(
+        "--controller",
+        default=os.environ.get("SMOKER_URL", "http://smoker.local"),
+        help="SmokerのURLまたはIPアドレス (既定: http://smoker.local)",
+    )
     args = parser.parse_args()
+
+    if not re.match(r"^https?://", args.controller, re.IGNORECASE):
+        args.controller = f"http://{args.controller}"
 
     if os.name == 'nt':
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-    asyncio.run(main(args.email, args.password))
+    asyncio.run(main(args.email, args.password, args.controller))

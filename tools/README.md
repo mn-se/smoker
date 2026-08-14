@@ -29,7 +29,10 @@ python -m pip install meross_iot requests
 
 PowerShell 例:
 
-python tools/meross_mss305.py <Merossメールアドレス> <Merossパスワード>
+python tools/meross_mss305.py <Merossメールアドレス> <Merossパスワード> --controller <SmokerのIPアドレス>
+
+`smoker.local` を解決できない Windows 環境では、コントローラの IP アドレスを指定してください。
+例: `python tools/meross_mss305.py <Merossメールアドレス> <Merossパスワード> --controller 192.168.1.50`
 
 実行後、スクリプトは次を順に行います。
 
