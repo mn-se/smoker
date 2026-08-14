@@ -19,7 +19,7 @@ void LogModule::writeHeaderIfNeeded() {
         logFile.close();
         logFile = LittleFS.open(_logFilePath, "w");
         if (logFile) {
-            logFile.println("Timestamp,CurrentTemp,TargetTemp,HeaterState");
+            logFile.println("Timestamp,CurrentTemp,TargetTemp,PwmOutput,HeaterState");
             logFile.close();
             Serial.println("[INFO] LogModule: Log file header written.");
         } else {
@@ -30,7 +30,7 @@ void LogModule::writeHeaderIfNeeded() {
     }
 }
 
-void LogModule::logData(float currentTemp, float targetTemp, int heaterState) {
+void LogModule::logData(float currentTemp, float targetTemp, float pwmOutput, int heaterState) {
     if (millis() - _lastLogTime < _logInterval) {
         return; // Not time to log yet
     }
@@ -53,6 +53,7 @@ void LogModule::logData(float currentTemp, float targetTemp, int heaterState) {
         String dataLine = String(millis()) + "," +
                           String(currentTemp, 2) + "," +
                           String(targetTemp, 2) + "," +
+                  String(pwmOutput, 1) + "," +
                           String(heaterState);
         logFile.println(dataLine);
         logFile.close();

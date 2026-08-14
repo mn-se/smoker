@@ -67,7 +67,7 @@ void TempControlModule::update() {
             if (_meross.toggle(false)) {
                 _heaterState = 0;
             }
-            _logModule.logData(temp, _targetTemp, _heaterState); // Log data even on error
+            _logModule.logData(temp, _targetTemp, 0.0f, _heaterState); // Log data even on error
         }
         return; // Error
     }
@@ -77,12 +77,13 @@ void TempControlModule::update() {
     }
 
     if (_state == ERROR_STATE) {
-        _logModule.logData(temp, _targetTemp, _heaterState); // Log data in error state
+        _logModule.logData(temp, _targetTemp, 0.0f, _heaterState); // Log data in error state
         return; // Do nothing in error state
     }
 
     Serial.printf("[TEMP] Current: %.2f°C, Target: %.2f°C, State: ", temp, _targetTemp);
 
+    float logPwmOutput = 0.0f;
     if (_state == TEMP_CONTROL) {
         Serial.print("TEMP_CONTROL");
         // PID Calculation
@@ -104,6 +105,7 @@ void TempControlModule::update() {
         else if (output < 0.0) output = 0.0;
         
         _pidOutput = output / 100.0;
+        logPwmOutput = output;
 
         // PWM Control (Time-Proportioning)
         unsigned long now = millis();
@@ -142,10 +144,11 @@ void TempControlModule::update() {
         }
     } else if (_state == FORCE_ON) {
         Serial.println("FORCE_ON");
+        logPwmOutput = 100.0f;
     } else if (_state == MONITORING) {
         Serial.printf("MONITORING -> %.2f°C\n", temp);
     }
-    _logModule.logData(temp, _targetTemp, _heaterState); // Log data at the end of update
+    _logModule.logData(temp, _targetTemp, logPwmOutput, _heaterState); // Log data at the end of update
 }
 
 ControlState TempControlModule::getState() {

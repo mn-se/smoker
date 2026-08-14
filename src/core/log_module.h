@@ -8,7 +8,7 @@ class LogModule {
 public:
     LogModule();
     void begin();
-    void logData(float currentTemp, float targetTemp, int heaterState);
+    void logData(float currentTemp, float targetTemp, float pwmOutput, int heaterState);
     String getLogFilePath();
     void clearLog();
 

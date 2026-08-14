@@ -48,6 +48,14 @@ function formatTime(date) {
            date.getSeconds().toString().padStart(2, '0');
 }
 
+function formatElapsedTime(milliseconds) {
+    const totalSeconds = Math.max(0, Math.floor(milliseconds / 1000));
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    return `${hours}h${minutes.toString().padStart(2, '0')}m${seconds.toString().padStart(2, '0')}s`;
+}
+
 // --- Real-time Chart ---
 const ctxRT = document.getElementById('tempChart').getContext('2d');
 let rtData = {
@@ -246,6 +254,7 @@ function parseAndRenderHistory(csv, isImport = false) {
     const hData = [];
     const hTarget = [];
     const labels = [];
+    const timestamps = [];
     
     if (isImport) {
         document.getElementById('info-date').value = '';
@@ -273,12 +282,21 @@ function parseAndRenderHistory(csv, isImport = false) {
         if (line.startsWith('Timestamp')) { dataStarted = true; return; }
         if (dataStarted) {
             const [ts, curr, tgt, state] = line.split(',');
+            const timestamp = Number(ts);
+            if (!Number.isFinite(timestamp)) return;
             hData.push(parseFloat(curr));
             hTarget.push(parseFloat(tgt));
-            const totalMinutes = labels.length * 1;
-            const h = Math.floor(totalMinutes / 60);
-            const m = totalMinutes % 60;
-            labels.push(`${h}h${m}m`);
+            timestamps.push(timestamp);
+        }
+    });
+
+    const timestampScale = timestamps.some(timestamp => timestamp >= 1000000000) ? 1000 : 1;
+    const firstTimestamp = timestamps[0] || 0;
+    timestamps.forEach(timestamp => {
+        if (timestampScale === 1000) {
+            labels.push(formatTime(new Date(timestamp * 1000)));
+        } else {
+            labels.push(formatElapsedTime((timestamp - firstTimestamp) * timestampScale));
         }
     });
 
@@ -288,7 +306,17 @@ function parseAndRenderHistory(csv, isImport = false) {
 
     // 最新の範囲を表示するようにx軸の範囲を設定
     const total = labels.length;
-    const windowSize = 300; // Show 5 hours at a time in history
+    let historyIntervalMs = 60000;
+    if (timestamps.length >= 2) {
+        const deltas = [];
+        for (let i = 1; i < timestamps.length; i++) {
+            const delta = (timestamps[i] - timestamps[i - 1]) * timestampScale;
+            if (delta > 0) deltas.push(delta);
+        }
+        deltas.sort((a, b) => a - b);
+        historyIntervalMs = deltas[Math.floor(deltas.length / 2)] || historyIntervalMs;
+    }
+    const windowSize = Math.max(1, Math.ceil((5 * 60 * 60 * 1000) / historyIntervalMs));
     historyChart.options.scales.x.min = total > windowSize ? total - windowSize : 0;
     historyChart.options.scales.x.max = total > 0 ? total - 1 : 0;
     
@@ -342,14 +370,14 @@ function parseLogToRT(csv) {
     });
     if (rows.length === 0) return null;
 
-    // Estimate logging interval from median delta
-    let intervalMs = 60000;
+    // Estimate logging interval from the actual log timestamps.
+    let intervalMs = 30000;
     if (rows.length >= 2) {
         const deltas = [];
         for (let i = 1; i < rows.length; i++) deltas.push(rows[i].ts - rows[i-1].ts);
         deltas.sort((a,b) => a-b);
         intervalMs = deltas[Math.floor(deltas.length/2)] || intervalMs;
-        if (intervalMs <= 0) intervalMs = 60000;
+        if (intervalMs <= 0) intervalMs = 30000;
     }
 
     // Number of log entries to cover ~30 minutes
@@ -359,11 +387,14 @@ function parseLogToRT(csv) {
     const labels = [];
     const currData = [];
     const tgtData = [];
-    const now = Date.now();
+    const lastTimestamp = slice[slice.length - 1].ts;
+    const isUnixSeconds = lastTimestamp >= 1000000000;
     for (let i = 0; i < slice.length; i++) {
-        const timeOffset = (slice.length - 1 - i) * intervalMs;
-        const labelTime = new Date(now - timeOffset);
-        labels.push(formatTime(labelTime));
+        if (isUnixSeconds) {
+            labels.push(formatTime(new Date(slice[i].ts * 1000)));
+        } else {
+            labels.push(formatElapsedTime((slice[i].ts - slice[0].ts) * 1));
+        }
         currData.push(slice[i].curr);
         tgtData.push(isNaN(slice[i].tgt) ? null : slice[i].tgt);
     }

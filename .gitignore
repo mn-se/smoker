@@ -1,6 +1,8 @@
 .pio
 .vscode/
+.venv/
 _internal_*
+*__pycache__*
 
 # Sensitive configuration files
 include/secrets.h
